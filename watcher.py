@@ -23,9 +23,9 @@ def scrape_units():
       )
     )
     page = ctx.new_page()
-    page.goto(URL, wait_until="networkidle", timeout=60_000)
+    page.goto(URL, wait_until="domcontentloaded", timeout=60_000)
     # Give the JS floorplan widget a moment to render unit cards
-    page.wait_for_timeout(5000)
+    page.wait_for_timeout(15000)
     text = page.content()
     browser.close()
 
