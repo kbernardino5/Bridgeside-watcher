@@ -6,137 +6,191 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 import requests
 
-URL = "https://livebridgeside.com/floorplans/"
+BASE = "https://livebridgeside.com"
+MAIN_URL = f"{BASE}/floorplans/"
 STATE_FILE = Path("state.json")
 WEBHOOK = os.environ["DISCORD_WEBHOOK_URL"]
 
+def fetch_page(page, url):
+    page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+    page.wait_for_timeout(8000)
+    return page.content()
 
-def scrape_units():
-  """Load the floorplans page and return a list of available units."""
-  with sync_playwright() as p:
-    browser = p.chromium.launch()
-    ctx = browser.new_context(
-      user_agent=(
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/125.0 Safari/537.36"
-      )
+def discover_floorplan_urls(text):
+    """Find all individual floorplan page URLs from the main listing."""
+    urls = set()
+    for m in re.finditer(r'href="([^"]*?/floorplans/the-[a-z0-9-]+/?)"', text, re.I):
+        url = m.group(1)
+        if url.startswith("/"):
+            url = BASE + url
+        urls.add(url.rstrip("/") + "/")
+    return sorted(urls)
+
+def parse_floorplan(text, url):
+    """Extract floorplan details from a single floorplan page."""
+    clean = re.sub(r"<[^>]+>", " ", text)
+    clean = re.sub(r"\s+", " ", clean)
+
+    slug = url.rstrip("/").split("/")[-1]
+    name = " ".join(w.capitalize() for w in slug.split("-"))
+
+    # Bed/bath/sqft: "Studio 1 bath 601 sq. ft." or "1 bed 1 bath 833 sq. ft." or "2 bed 2 bath 1265 sq. ft."
+    bbs = re.search(
+        r"(Studio|(\d)\s*bed)\s*(\d)\s*bath\s*([\d,]+)\s*sq\.?\s*ft",
+        clean, re.I,
     )
-    page = ctx.new_page()
-    page.goto(URL, wait_until="domcontentloaded", timeout=60_000)
-    # Give the JS floorplan widget a moment to render unit cards
-    page.wait_for_timeout(15000)
-    text = page.content()
-    # DEBUG: print a chunk of the page so we can see the unit format
-    import re as _re
-    for keyword in ["bedroom", "bed", "available", "rent", "$"]:
-      matches = list(_re.finditer(keyword, text, _re.IGNORECASE))
-      print(f"DEBUG: '{keyword}' appears {len(matches)} times", file=sys.stderr)
-    print("DEBUG: page length =", len(text), file=sys.stderr)
-    # Dump 2000 chars around the first "$" so we can see pricing context
-    dollar_idx = text.find("$")
-    if dollar_idx > 0:
-      print("DEBUG: context around first $:", file=sys.stderr)
-      print(text[max(0, dollar_idx-500):dollar_idx+1500], file=sys.stderr)
-    browser.close()
-
-  units = []
-  # Match unit blocks: looks for "Unit ####" followed by surrounding context.
-  # Apartment sites typically render: Unit 0123 ... 2 Bed ... $2,450 ... Available Jun 1
-  for m in re.finditer(
-    r"(Unit\s*#?\s*\d{2,5})(.{0,400}?)(?=Unit\s*#?\s*\d{2,5}|$)",
-    text,
-    re.IGNORECASE | re.DOTALL,
-  ):
-    block = (m.group(1) + m.group(2)).strip()
-    block_clean = re.sub(r"<[^>]+>", " ", block) # strip HTML tags
-    block_clean = re.sub(r"\s+", " ", block_clean)
-
-    unit_id = re.search(r"Unit\s*#?\s*(\d{2,5})", block_clean, re.I)
-    beds = re.search(r"(Studio|(\d)\s*Bed)", block_clean, re.I)
-    price = re.search(r"\$[\d,]+", block_clean)
-    sqft = re.search(r"([\d,]+)\s*sq\.?\s*ft", block_clean, re.I)
-    avail = re.search(r"Available[^.]{0,40}", block_clean, re.I)
-
-    if not unit_id:
-      continue
-
-    if beds:
-      bed_label = "Studio" if beds.group(1).lower().startswith("studio") else f"{beds.group(2)}BR"
+    if bbs:
+        bed_label = "Studio" if bbs.group(1).lower().startswith("studio") else f"{bbs.group(2)}BR"
+        bath = bbs.group(3)
+        sqft = bbs.group(4)
     else:
-      bed_label = "Unknown"
+        bed_label, bath, sqft = "?", "?", "?"
 
-    units.append({
-      "id": unit_id.group(1),
-      "type": bed_label,
-      "price": price.group(0) if price else "N/A",
-      "sqft": sqft.group(1) if sqft else "N/A",
-      "available": avail.group(0).strip() if avail else "N/A",
-    })
+    # Availability signals
+    avail_count = re.search(r"Only\s+(\d+)\s+left", clean, re.I)
+    rent = re.search(r"\$([\d,]+)\s*/mo", clean)
+    base_rent = re.search(r"\$([\d,]+)\s+Base\s+Rent", clean, re.I)
 
-  # Dedupe by unit id
-  seen, deduped = set(), []
-  for u in units:
-    if u["id"] not in seen:
-      seen.add(u["id"])
-      deduped.append(u)
-  return deduped
+    if avail_count or rent:
+        available = True
+        count = avail_count.group(1) if avail_count else "?"
+        price = f"${rent.group(1)}/mo" if rent else "N/A"
+    else:
+        available = False
+        count = "0"
+        price = "N/A"
 
+    return {
+        "slug": slug,
+        "name": name,
+        "type": bed_label,
+        "bath": bath,
+        "sqft": sqft,
+        "available": available,
+        "count": count,
+        "price": price,
+        "url": url,
+    }
+
+def scrape_all():
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(
+            user_agent=(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/125.0 Safari/537.36"
+            )
+        )
+        page = ctx.new_page()
+
+        main_html = fetch_page(page, MAIN_URL)
+        urls = discover_floorplan_urls(main_html)
+        print(f"Discovered {len(urls)} floorplan pages", file=sys.stderr)
+
+        floorplans = []
+        for url in urls:
+            html = fetch_page(page, url)
+            fp = parse_floorplan(html, url)
+            floorplans.append(fp)
+            print(
+                f"  {fp['name']} ({fp['type']}): "
+                f"available={fp['available']} count={fp['count']} price={fp['price']}",
+                file=sys.stderr,
+            )
+
+        browser.close()
+        return floorplans
 
 def load_state():
-  if STATE_FILE.exists():
-    return json.loads(STATE_FILE.read_text())
-  return {"units": []}
+    if STATE_FILE.exists():
+        try:
+            data = json.loads(STATE_FILE.read_text())
+            if "floorplans" in data:
+                return data
+        except Exception:
+            pass
+    return {"floorplans": {}}
 
+def save_state(floorplans):
+    state = {"floorplans": {fp["slug"]: fp for fp in floorplans}}
+    STATE_FILE.write_text(json.dumps(state, indent=2))
 
-def save_state(units):
-  STATE_FILE.write_text(json.dumps({"units": units}, indent=2))
+def diff(current, prev):
+    changes = []
+    prev_fps = prev.get("floorplans", {})
+    for fp in current:
+        slug = fp["slug"]
+        prev_fp = prev_fps.get(slug)
+        if prev_fp is None and fp["available"]:
+            changes.append(("new_available", fp, None))
+        elif prev_fp and fp["available"] and not prev_fp.get("available"):
+            changes.append(("became_available", fp, prev_fp))
+        elif prev_fp and not fp["available"] and prev_fp.get("available"):
+            changes.append(("became_unavailable", fp, prev_fp))
+        elif (
+            prev_fp
+            and fp["available"]
+            and prev_fp.get("available")
+            and fp.get("count") != prev_fp.get("count")
+        ):
+            changes.append(("count_changed", fp, prev_fp))
+    return changes
 
-
-def notify(new_units, removed_units):
-  lines = []
-  if new_units:
-    lines.append("🏠 **New apartments available at Bridgeside!**\n")
-    for u in new_units:
-      lines.append(
-        f"• **Unit {u['id']}** — {u['type']} · {u['price']} · "
-        f"{u['sqft']} sqft · {u['available']}"
-      )
-  if removed_units:
-    lines.append("\n📭 No longer listed:")
-    for u in removed_units:
-      lines.append(f"• Unit {u['id']} ({u['type']})")
-  lines.append("\nhttps://livebridgeside.com/floorplans/")
-  lines.append("Call leasing: (843) 887-1428")
-
-  requests.post(WEBHOOK, json={"content": "\n".join(lines)}, timeout=30).raise_for_status()
-
+def notify(lines):
+    requests.post(
+        WEBHOOK, json={"content": "\n".join(lines)}, timeout=30
+    ).raise_for_status()
 
 def main():
-  current = scrape_units()
-  print(f"Scraped {len(current)} units", file=sys.stderr)
+    current = scrape_all()
+    prev = load_state()
 
-  prev = load_state()
-  prev_ids = {u["id"] for u in prev["units"]}
-  curr_ids = {u["id"] for u in current}
+    # First run: send a snapshot of currently-available floorplans
+    if not prev.get("floorplans"):
+        avail = [fp for fp in current if fp["available"]]
+        lines = ["🏠 **Bridgeside watcher initialized**\n"]
+        if avail:
+            lines.append("Currently available:")
+            for fp in avail:
+                lines.append(
+                    f"• **{fp['name']}** — {fp['type']} · {fp['sqft']} sqft · "
+                    f"{fp['price']} · {fp['count']} left"
+                )
+        else:
+            lines.append("No floorplans currently available. Watching for changes.")
+        lines.append(f"\n{MAIN_URL}")
+        lines.append("Call leasing: (843) 887-1428")
+        notify(lines)
+        save_state(current)
+        return
 
-  new_units = [u for u in current if u["id"] not in prev_ids]
-  removed_units = [u for u in prev["units"] if u["id"] not in curr_ids]
+    changes = diff(current, prev)
+    if not changes:
+        print("No changes", file=sys.stderr)
+        save_state(current)
+        return
 
-  if new_units or removed_units:
-    notify(new_units, removed_units)
-    print(f"Notified: +{len(new_units)} new, -{len(removed_units)} removed", file=sys.stderr)
-  else:
-    print("No changes", file=sys.stderr)
-
-  save_state(current)
-
+    lines = ["🏠 **Bridgeside update!**\n"]
+    for kind, fp, prev_fp in changes:
+        if kind in ("new_available", "became_available"):
+            lines.append(
+                f"✅ **{fp['name']}** is AVAILABLE — {fp['type']} · {fp['sqft']} sqft · "
+                f"{fp['price']} · {fp['count']} left"
+            )
+        elif kind == "became_unavailable":
+            lines.append(f"❌ **{fp['name']}** ({fp['type']}) is no longer available")
+        elif kind == "count_changed":
+            lines.append(
+                f"📊 **{fp['name']}** ({fp['type']}): now {fp['count']} left "
+                f"(was {prev_fp.get('count', '?')}) · {fp['price']}"
+            )
+    lines.append(f"\n{MAIN_URL}")
+    lines.append("Call leasing: (843) 887-1428")
+    notify(lines)
+    print(f"Sent alert for {len(changes)} changes", file=sys.stderr)
+    save_state(current)
 
 if __name__ == "__main__":
-  main()
-  # DEBUG: send a heartbeat notification so we know if discord is reachable
-  requests.post(
-    WEBHOOK,
-    json={"content": "🔧 Bridgeside watcher ran successfully (test ping)"},
-    timeout=30
-  )
+    main()
+
