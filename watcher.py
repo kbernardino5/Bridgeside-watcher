@@ -27,6 +27,17 @@ def scrape_units():
     # Give the JS floorplan widget a moment to render unit cards
     page.wait_for_timeout(15000)
     text = page.content()
+    # DEBUG: print a chunk of the page so we can see the unit format
+    import re as _re
+    for keyword in ["bedroom", "bed", "available", "rent", "$"]:
+      matches = list(_re.finditer(keyword, text, _re.IGNORECASE))
+      print(f"DEBUG: '{keyword}' appears {len(matches)} times", file=sys.stderr)
+    print("DEBUG: page length =", len(text), file=sys.stderr)
+    # Dump 2000 chars around the first "$" so we can see pricing context
+    dollar_idx = text.find("$")
+    if dollar_idx > 0:
+      print("DEBUG: context around first $:", file=sys.stderr)
+      print(text[max(0, dollar_idx-500):dollar_idx+1500], file=sys.stderr)
     browser.close()
 
   units = []
@@ -123,3 +134,9 @@ def main():
 
 if __name__ == "__main__":
   main()
+  # DEBUG: send a heartbeat notification so we know if discord is reachable
+  requests.post(
+    WEBHOOK,
+    json={"content": "🔧 Bridgeside watcher ran successfully (test ping)"},
+    timeout=30
+  )
