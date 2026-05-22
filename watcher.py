@@ -12,9 +12,17 @@ STATE_FILE = Path("state.json")
 WEBHOOK = os.environ["DISCORD_WEBHOOK_URL"]
 
 def fetch_page(page, url):
-    page.goto(url, wait_until="domcontentloaded", timeout=60_000)
-    page.wait_for_timeout(8000)
-    return page.content()
+    last_error = None
+    for attempt in range(3):
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=90_000)
+            page.wait_for_timeout(8000)
+            return page.content()
+        except Exception as e:
+            last_error = e
+            print(f"  Attempt {attempt + 1} failed for {url}: {e}", file=sys.stderr)
+            page.wait_for_timeout(5000)  # wait 5s before retry
+    raise last_error
 
 def discover_floorplan_urls(text):
     """Find all individual floorplan page URLs from the main listing."""
