@@ -50,8 +50,8 @@
       "type": "1BR",
       "bath": "1",
       "sqft": "833",
-      "available": true,
-      "count": "1",
+      "available": false,
+      "count": "0",
       "price": "N/A",
       "url": "https://livebridgeside.com/floorplans/the-moultrie/"
     },
@@ -94,8 +94,8 @@
       "type": "2BR",
       "bath": "2",
       "sqft": "1196",
-      "available": true,
-      "count": "1",
+      "available": false,
+      "count": "0",
       "price": "N/A",
       "url": "https://livebridgeside.com/floorplans/the-sullivan/"
     },
