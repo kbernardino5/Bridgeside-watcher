@@ -28,8 +28,8 @@
       "type": "Studio",
       "bath": "1",
       "sqft": "601",
-      "available": false,
-      "count": "0",
+      "available": true,
+      "count": "1",
       "price": "N/A",
       "url": "https://livebridgeside.com/floorplans/the-grace/"
     },
