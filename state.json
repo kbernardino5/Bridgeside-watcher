@@ -1,3 +1,114 @@
 {
-  "floorplans": {}
+  "floorplans": {
+    "the-essex": {
+      "slug": "the-essex",
+      "name": "The Essex",
+      "type": "2BR",
+      "bath": "2",
+      "sqft": "1208",
+      "available": false,
+      "count": "0",
+      "price": "N/A",
+      "url": "https://livebridgeside.com/floorplans/the-essex/"
+    },
+    "the-folly": {
+      "slug": "the-folly",
+      "name": "The Folly",
+      "type": "1BR",
+      "bath": "1",
+      "sqft": "713",
+      "available": true,
+      "count": "1",
+      "price": "N/A",
+      "url": "https://livebridgeside.com/floorplans/the-folly/"
+    },
+    "the-grace": {
+      "slug": "the-grace",
+      "name": "The Grace",
+      "type": "Studio",
+      "bath": "1",
+      "sqft": "601",
+      "available": false,
+      "count": "0",
+      "price": "N/A",
+      "url": "https://livebridgeside.com/floorplans/the-grace/"
+    },
+    "the-morris": {
+      "slug": "the-morris",
+      "name": "The Morris",
+      "type": "1BR",
+      "bath": "1",
+      "sqft": "899",
+      "available": true,
+      "count": "1",
+      "price": "N/A",
+      "url": "https://livebridgeside.com/floorplans/the-morris/"
+    },
+    "the-moultrie": {
+      "slug": "the-moultrie",
+      "name": "The Moultrie",
+      "type": "1BR",
+      "bath": "1",
+      "sqft": "833",
+      "available": false,
+      "count": "0",
+      "price": "N/A",
+      "url": "https://livebridgeside.com/floorplans/the-moultrie/"
+    },
+    "the-murray": {
+      "slug": "the-murray",
+      "name": "The Murray",
+      "type": "2BR",
+      "bath": "2",
+      "sqft": "1095",
+      "available": false,
+      "count": "0",
+      "price": "N/A",
+      "url": "https://livebridgeside.com/floorplans/the-murray/"
+    },
+    "the-patriot": {
+      "slug": "the-patriot",
+      "name": "The Patriot",
+      "type": "2BR",
+      "bath": "2",
+      "sqft": "1265",
+      "available": false,
+      "count": "0",
+      "price": "N/A",
+      "url": "https://livebridgeside.com/floorplans/the-patriot/"
+    },
+    "the-scout": {
+      "slug": "the-scout",
+      "name": "The Scout",
+      "type": "1BR",
+      "bath": "1",
+      "sqft": "675",
+      "available": false,
+      "count": "0",
+      "price": "N/A",
+      "url": "https://livebridgeside.com/floorplans/the-scout/"
+    },
+    "the-sullivan": {
+      "slug": "the-sullivan",
+      "name": "The Sullivan",
+      "type": "2BR",
+      "bath": "2",
+      "sqft": "1196",
+      "available": false,
+      "count": "0",
+      "price": "N/A",
+      "url": "https://livebridgeside.com/floorplans/the-sullivan/"
+    },
+    "the-sumter": {
+      "slug": "the-sumter",
+      "name": "The Sumter",
+      "type": "1BR",
+      "bath": "1",
+      "sqft": "868",
+      "available": false,
+      "count": "0",
+      "price": "N/A",
+      "url": "https://livebridgeside.com/floorplans/the-sumter/"
+    }
+  }
 }
