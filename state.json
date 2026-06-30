@@ -6,8 +6,8 @@
       "type": "2BR",
       "bath": "2",
       "sqft": "1208",
-      "available": false,
-      "count": "0",
+      "available": true,
+      "count": "1",
       "price": "N/A",
       "url": "https://livebridgeside.com/floorplans/the-essex/"
     },
