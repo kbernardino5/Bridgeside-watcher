@@ -17,8 +17,8 @@
       "type": "1BR",
       "bath": "1",
       "sqft": "713",
-      "available": true,
-      "count": "1",
+      "available": false,
+      "count": "0",
       "price": "N/A",
       "url": "https://livebridgeside.com/floorplans/the-folly/"
     },
