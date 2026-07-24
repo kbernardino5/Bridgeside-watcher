@@ -83,8 +83,8 @@
       "type": "1BR",
       "bath": "1",
       "sqft": "675",
-      "available": false,
-      "count": "0",
+      "available": true,
+      "count": "1",
       "price": "N/A",
       "url": "https://livebridgeside.com/floorplans/the-scout/"
     },
@@ -105,8 +105,8 @@
       "type": "1BR",
       "bath": "1",
       "sqft": "868",
-      "available": true,
-      "count": "1",
+      "available": false,
+      "count": "0",
       "price": "N/A",
       "url": "https://livebridgeside.com/floorplans/the-sumter/"
     }
